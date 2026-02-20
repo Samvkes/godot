@@ -169,10 +169,10 @@
 			The shadow size in pixels.
 		</member>
 		<member name="gaussian_approximate_gaussian" type="bool" setter="set_approximate_gaussian" getter="get_approximate_gaussian" default="false">
-			Toggle to switch to a shadow that approximates Gaussian falloff by using multiple "rings" of linear shadows. Tends to take more processing power. 
+			Toggle to switch to a shadow that approximates Gaussian falloff by using multiple "rings" of linear shadows. Tends to take more processing power.
 		</member>
 		<member name="gaussian_rings" type="int" setter="set_gaussian_rings" getter="get_gaussian_rings" default="6">
-			The amount of shadow "rings" used to approximate a Gaussian falloff. More rings tend to look better but take more processing power. 
+			The amount of shadow "rings" used to approximate a Gaussian falloff. More rings tend to look better but take more processing power.
 		</member>
 		<member name="gaussian_spread" type="float" setter="set_gaussian_spread" getter="get_gaussian_spread" default="0">
 			Grow or shrink the whole shadow while keeping the falloff the same.

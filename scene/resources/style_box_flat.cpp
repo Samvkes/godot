@@ -135,17 +135,20 @@ int StyleBoxFlat::get_corner_detail() const {
 	return corner_detail;
 }
 
-void StyleBoxFlat::set_approximate_gaussian(const bool &p_approximate_gaussian) {
+void StyleBoxFlat::set_approximate_gaussian(bool p_approximate_gaussian) {
+	if (approximate_gaussian == p_approximate_gaussian) {
+		return;
+	}
 	approximate_gaussian = p_approximate_gaussian;
 	emit_changed();
 	notify_property_list_changed();
 }
 
-bool StyleBoxFlat::get_approximate_gaussian() const {
+bool StyleBoxFlat::is_using_approximate_gaussian() const {
 	return approximate_gaussian;
 }
 
-void StyleBoxFlat::set_gaussian_rings(const int &p_gaussian_rings) {
+void StyleBoxFlat::set_gaussian_rings(int p_gaussian_rings) {
 	gaussian_rings = CLAMP(p_gaussian_rings, 1, 30);
 	emit_changed();
 }
@@ -154,7 +157,7 @@ int StyleBoxFlat::get_gaussian_rings() const {
 	return gaussian_rings;
 }
 
-void StyleBoxFlat::set_gaussian_spread(const real_t &p_gaussian_spread) {
+void StyleBoxFlat::set_gaussian_spread(real_t p_gaussian_spread) {
 	gaussian_spread = p_gaussian_spread;
 	emit_changed();
 }
@@ -481,6 +484,17 @@ Rect2 StyleBoxFlat::get_draw_rect(const Rect2 &p_rect) const {
 	return draw_rect;
 }
 
+real_t shadow_erf_approx(float x, int shadow_size) {
+	x = x / ((shadow_size / 2.6) * 1.41421f);
+	x = 1 + 0.278393 * x + 0.230389 * x * x + 0.000972 * x * x * x + 0.078108 * x * x * x * x;
+	return 1.0 / (x * x * x * x);
+}
+
+real_t shadow_dist_at(int ring_index, int ring_count, int shadow_size) {
+	float t = float(ring_index) / float(ring_count);
+	return shadow_size * Math::pow(t, 0.9f);
+}
+
 void StyleBoxFlat::draw(RID p_canvas_item, const Rect2 &p_rect) const {
 	bool draw_border = (border_width[0] > 0) || (border_width[1] > 0) || (border_width[2] > 0) || (border_width[3] > 0);
 	bool draw_shadow = (shadow_size > 0);
@@ -521,7 +535,7 @@ void StyleBoxFlat::draw(RID p_canvas_item, const Rect2 &p_rect) const {
 	real_t shadow_corner[4] = { 1000000.0, 1000000.0, 1000000.0, 1000000.0 };
 	real_t shadow_corner_radius = MAX(shadow_size / 2.8, 1.0);
 	real_t shadow_corner_radius_arr[4];
-	const real_t smallest_shadow_radius = MAX(style_rect.size.height - shadow_size / 2.0 + gaussian_spread * 2.0, 2.0);
+	const real_t smallest_shadow_radius = MAX(MIN(style_rect.size.height, style_rect.size.width) - shadow_size / 2.0 + gaussian_spread * 2.0, 2.0);
 	for (int i = 0; i < 4; i++) {
 		shadow_corner_radius_arr[i] = MIN(MAX(MAX(1.0, shadow_size / 2.8), adapted_corner[i]), smallest_shadow_radius / 2.0);
 	}
@@ -567,37 +581,27 @@ void StyleBoxFlat::draw(RID p_canvas_item, const Rect2 &p_rect) const {
 		shadow_inner_rect.position += shadow_offset;
 
 		if (approximate_gaussian) {
+			real_t smallest_dim = MIN(style_rect.size.height, style_rect.size.width);
 			// Shrink inner rect so the shadow doesn't start at the edge of the shape.
 			real_t start_shadow_size = -shadow_size / 4.0 + gaussian_spread;
-			if (start_shadow_size * 2.0 + style_rect.size.height <= 2.0) {
-				start_shadow_size = (-style_rect.size.height / 2.0) + 1;
+			if (start_shadow_size * 2.0 + smallest_dim <= 2.0) {
+				start_shadow_size = (-smallest_dim / 2.0) + 1;
 			}
 			shadow_inner_rect = shadow_inner_rect.grow(start_shadow_size);
 
 			// If there are more rings than the size of the shadow in pixels, we get weird artifacts.
 			int real_gaussian_rings = MAX(shadow_size / 2 > gaussian_rings ? gaussian_rings : shadow_size / 2, 1);
-			float ring_size = shadow_size / real_gaussian_rings;
-
-			// Error function approximation, gives a Gaussian-like transition.
-			auto erf_approx = [&](float x) {
-				x = x / ((shadow_size / 2.6) * 1.41421f);
-				x = 1 + 0.278393 * x + 0.230389 * x * x + 0.000972 * x * x * x + 0.078108 * x * x * x * x;
-				return 1.0 / (x * x * x * x);
-			};
-
-			// Avoid hard shadow edges by scaling the rings smaller the farther away they get.
-			auto dist_at = [&](int i) {
-				float t = float(i) / float(real_gaussian_rings);
-				return shadow_size * Math::pow(t, 0.9f);
-			};
+			real_t ring_size = shadow_size / real_gaussian_rings;
 
 			for (int r = 0; r < real_gaussian_rings; r++) {
-				real_t inner_dist = dist_at(r);
-				real_t outer_dist = dist_at(r + 1);
+				// Avoid hard shadow edges by making the rings increasingly thin.
+				real_t inner_dist = shadow_dist_at(r, real_gaussian_rings, shadow_size);
+				real_t outer_dist = shadow_dist_at(r + 1, real_gaussian_rings, shadow_size);
 				Color inner_col = shadow_color;
 				Color outer_col = shadow_color;
-				inner_col.a *= erf_approx(inner_dist);
-				outer_col.a *= erf_approx(outer_dist);
+				// Error function approximation (by A&S), gives a Gaussian-like transition.
+				inner_col.a *= shadow_erf_approx(inner_dist, shadow_size);
+				outer_col.a *= shadow_erf_approx(outer_dist, shadow_size);
 
 				Rect2 inner = style_rect.grow(start_shadow_size + inner_dist);
 				inner.position += shadow_offset;
@@ -777,7 +781,7 @@ void StyleBoxFlat::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_gaussian_rings"), &StyleBoxFlat::get_gaussian_rings);
 
 	ClassDB::bind_method(D_METHOD("set_approximate_gaussian", "approximate_gaussian"), &StyleBoxFlat::set_approximate_gaussian);
-	ClassDB::bind_method(D_METHOD("get_approximate_gaussian"), &StyleBoxFlat::get_approximate_gaussian);
+	ClassDB::bind_method(D_METHOD("is_using_approximate_gaussian"), &StyleBoxFlat::is_using_approximate_gaussian);
 
 	ClassDB::bind_method(D_METHOD("set_gaussian_spread", "spread"), &StyleBoxFlat::set_gaussian_spread);
 	ClassDB::bind_method(D_METHOD("get_gaussian_spread"), &StyleBoxFlat::get_gaussian_spread);
@@ -817,7 +821,7 @@ void StyleBoxFlat::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "shadow_size", PROPERTY_HINT_RANGE, "0,100,1,or_greater,suffix:px"), "set_shadow_size", "get_shadow_size");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "shadow_offset", PROPERTY_HINT_NONE, "suffix:px"), "set_shadow_offset", "get_shadow_offset");
 	ADD_SUBGROUP("Gaussian", "gaussian_");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gaussian_approximate_gaussian", PROPERTY_HINT_GROUP_ENABLE), "set_approximate_gaussian", "get_approximate_gaussian");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gaussian_approximate_gaussian", PROPERTY_HINT_GROUP_ENABLE), "set_approximate_gaussian", "is_using_approximate_gaussian");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "gaussian_rings", PROPERTY_HINT_RANGE, "1,30,1"), "set_gaussian_rings", "get_gaussian_rings");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gaussian_spread", PROPERTY_HINT_RANGE, "-100,100,0.1,or_greater,suffix:px"), "set_gaussian_spread", "get_gaussian_spread");
 
