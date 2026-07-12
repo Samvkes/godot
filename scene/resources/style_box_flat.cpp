@@ -592,12 +592,12 @@ void StyleBoxFlat::draw(RID p_canvas_item, const Rect2 &p_rect) const {
 			// Inner border rect, transparent side of antialiasing gradient (base inner rect shrunk by AA size)
 			Rect2 inner_rect_aa_transparent = inner_rect_aa_colored.grow_individual(-aa_border_width[SIDE_LEFT], -aa_border_width[SIDE_TOP],
 					-aa_border_width[SIDE_RIGHT], -aa_border_width[SIDE_BOTTOM]);
-			// Outer border rect, transparent side of antialiasing gradient (base outer rect enlarged by AA size)
-			Rect2 outer_rect_aa_transparent = style_rect.grow_individual(MAX(0, aa_border_width_half[SIDE_LEFT]), MAX(0, aa_border_width_half[SIDE_TOP]),
-					MAX(0, aa_border_width_half[SIDE_RIGHT]), MAX(0, aa_border_width_half[SIDE_BOTTOM]));
 			// Outer border rect, colored side of antialiasing gradient (base outer rect shrunk by AA size)
-			Rect2 outer_rect_aa_colored = border_style_rect.grow_individual(aa_border_width_half[SIDE_LEFT] < 0 ? -aa_size_scaled : aa_size_scaled, aa_border_width_half[SIDE_TOP] < 0 ? -aa_size_scaled : aa_size_scaled,
-					aa_border_width_half[SIDE_RIGHT] < 0 ? -aa_size_scaled : aa_size_scaled, aa_border_width_half[SIDE_BOTTOM] < 0 ? -1 * aa_size_scaled : aa_size_scaled);
+			Rect2 outer_rect_aa_colored = border_style_rect.grow_individual(aa_border_width_half[SIDE_LEFT] < 0 ? -0.5 * aa_size_scaled : aa_size_scaled, aa_border_width_half[SIDE_TOP] < 0 ? -0.5 * aa_size_scaled : aa_size_scaled,
+					aa_border_width_half[SIDE_RIGHT] < 0 ? -aa_size_scaled * 0.5 : aa_size_scaled, aa_border_width_half[SIDE_BOTTOM] < 0 ? -0.5 * aa_size_scaled : aa_size_scaled);
+			// Outer border rect, transparent side of antialiasing gradient (base outer rect enlarged by AA size)
+			Rect2 outer_rect_aa_transparent = style_rect.grow_individual(MAX(0.5 * aa_size_scaled, aa_border_width_half[SIDE_LEFT]), MAX(0.5 * aa_size_scaled, aa_border_width_half[SIDE_TOP]),
+					MAX(0.5 * aa_size_scaled, aa_border_width_half[SIDE_RIGHT]), MAX(0.5 * aa_size_scaled, aa_border_width_half[SIDE_BOTTOM]));
 
 			// Create border ring, not antialiased yet
 			draw_rounded_rectangle(verts, indices, colors, border_style_rect, adapted_corner,
@@ -619,12 +619,12 @@ void StyleBoxFlat::draw(RID p_canvas_item, const Rect2 &p_rect) const {
 			// Infill rect, colored side of antialiasing gradient (base infill rect shrunk by AA size)
 			Rect2 infill_rect_aa_colored = infill_rect_aa_transparent.grow_individual(-aa_fill_width[SIDE_LEFT], -aa_fill_width[SIDE_TOP],
 					-aa_fill_width[SIDE_RIGHT], -aa_fill_width[SIDE_BOTTOM]);
-			if (!blend_on) {
+			if (true) {
 				// Create center fill, not antialiased yet
 				draw_rounded_rectangle(verts, indices, colors, border_style_rect, adapted_corner,
 						infill_rect_aa_colored, infill_rect_aa_colored, bg_color, bg_color, corner_detail, skew, true);
 			}
-			if (!blend_on || !draw_border) {
+			if (true) {
 				Color alpha_bg = Color(bg_color.r, bg_color.g, bg_color.b, 0);
 				// Add antialiasing on the center fill
 				draw_rounded_rectangle(verts, indices, colors, border_style_rect, adapted_corner,
